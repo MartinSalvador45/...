@@ -7056,6 +7056,20 @@ end
         end)
     end)
 
+    spawn(function()
+        while wait(1) do
+            local Tiki = workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("TikiOutpost")
+            local Island = Tiki and Tiki:FindFirstChild("IslandModel")
+            local Chunks = Island and Island:FindFirstChild("IslandChunks")
+            local B = Chunks and Chunks:FindFirstChild("B")
+            local RockArch = B and B:FindFirstChild("Meshes/rockarch2")
+
+            if RockArch then
+                RockArch:Destroy()
+            end
+        end
+    end)
+
     Tbl8.SettingSkillMain:AddToggle("Use skill fast dont hold", {
         Title = Translate("Use skill fast dont hold"),
         Default = Config["Use skill fast dont hold"] or true,
