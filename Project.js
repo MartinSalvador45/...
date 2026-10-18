@@ -3082,8 +3082,6 @@ setreadonly(MT, true)]])()
                     if Config["Random Devil Fruit"] then
                         if not game:GetService("Players").LocalPlayer.PlayerGui:FindFirstChild("SpinnerWindow") or not game:GetService("Players").LocalPlayer.PlayerGui:FindFirstChild("SpinnerWindow").Enabled then
                             Fn26()
-                        elseif game:GetService("Players").LocalPlayer.PlayerGui:FindFirstChild("SpinnerWindow").Enabled and game:GetService("Players").LocalPlayer.PlayerGui:FindFirstChild("SpinnerWindow").CloseButton.Visible then
-                            Spinner:Close()
                         end
                     end
 
@@ -3092,6 +3090,27 @@ setreadonly(MT, true)]])()
                         StoreFruit(LocalPlayer2.Character)
                     end
                 end)
+            end
+        end)
+
+        -- The X of the spin window (PlayerGui.SpinnerWindow.AboveSpinner.Navigation.CloseButton). It shows up when the spin ends and its
+        -- Activated just calls Spinner:Close(). Own fast loop so a slow Purchase invoke in the 2s loop above can't delay it
+        task.spawn(function()
+            while task.wait(0.25) and not Lib.Unloaded do
+                if Config["Random Devil Fruit"] then
+                    V13(function()
+                        local SpinnerWindow = LocalPlayer2.PlayerGui:FindFirstChild("SpinnerWindow")
+                        if not (SpinnerWindow and SpinnerWindow.Enabled) then
+                            return
+                        end
+                        local AboveSpinner = SpinnerWindow:FindFirstChild("AboveSpinner")
+                        local Navigation = AboveSpinner and AboveSpinner:FindFirstChild("Navigation")
+                        local CloseButton = Navigation and Navigation:FindFirstChild("CloseButton")
+                        if CloseButton and CloseButton.Visible then
+                            Spinner:Close()
+                        end
+                    end)
+                end
             end
         end)
     end
@@ -4059,9 +4078,17 @@ end
                 end
             end
 
+            local MyHumanoid = LocalPlayer2.Character:FindFirstChildWhichIsA("Humanoid")
+
+            for _, V63 in V18(Tbl9) do
+                if MyHumanoid and V63.Occupant == MyHumanoid then
+                    return V63
+                end
+            end
+
             for _, V63 in V18(Tbl9) do
                 local Occupant = V63.Occupant
-                if not Occupant or Occupant == LocalPlayer2.Character:FindFirstChildWhichIsA("Humanoid") then
+                if not Occupant or Occupant == MyHumanoid then
                     return V63
                 end
             end
@@ -6187,7 +6214,7 @@ end
                             if MeshesSerpentShipRetopoRopes and not LocalPlayer2.Character.Humanoid.Sit then
                                 toTarget(LocalPlayer2.Character.HumanoidRootPart.Position, MeshesSerpentShipRetopoRopes.Position, MeshesSerpentShipRetopoRopes.CFrame)
                             end
-                        elseif not V60 and not LocalPlayer2.Character.Humanoid.Sit and not V61 then
+                        elseif not V60 and not V61 then
                             local V62 = checkboatBeastHunter()
                             local Value = Options["Select Owner Boat Beast Hunter"].Value
                             local V63 = game.Players:FindFirstChild(Value)
@@ -7061,11 +7088,13 @@ end
             local Tiki = workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("TikiOutpost")
             local Island = Tiki and Tiki:FindFirstChild("IslandModel")
             local Chunks = Island and Island:FindFirstChild("IslandChunks")
-            local B = Chunks and Chunks:FindFirstChild("B")
-            local RockArch = B and B:FindFirstChild("Meshes/rockarch2")
 
-            if RockArch then
-                RockArch:Destroy()
+            for _, Name in V18({ "A", "B" }) do
+                local Chunk = Chunks and Chunks:FindFirstChild(Name)
+
+                if Chunk then
+                    Chunk:Destroy()
+                end
             end
         end
     end)
@@ -7322,6 +7351,9 @@ end
         -- so right after arriving it isn't there yet: keep checking on the boat for this long before giving up
         local CheckWindow = 20
         local CheckEvery = 3
+
+        -- The server answers "Enchant" with false and no reason when it refuses a roll: try again (after the Roll Delay, with a fresh Check) this many times in a row
+        local MaxEnchantFailures = 3
 
         local WeaponOrder = { "Sword", "Gun" }
         local StatusOrder = { "Sword", "Gun", "Info" }
@@ -7860,8 +7892,9 @@ end
         -- Returns EvaluateWeapon's verdict once it stops being "roll" (or "done" on a hit), or "off" (toggled off)
         local function RollWeapon(weaponType)
             local rolls = 0
+            local failures = 0
             while true do
-                if rolls > 0 then
+                if rolls > 0 or failures > 0 then
                     task.wait(tonumber(Config["Auto Enchant Roll Delay"]) or 5)
                 end
                 if not IsActive() then
@@ -7880,9 +7913,15 @@ end
                 SetStatus(weaponType, ("rolling #%d (%s left: %d)"):format(Rolls.Get(tool.Name) + 1, scrollName, owned))
                 local ok, result = pcall(EnchantInvoke.InvokeServer, EnchantInvoke, "Enchant", tool, scrollName)
                 if not ok or type(result) ~= "table" then
-                    SetStatus(weaponType, ("Enchant failed (%s)"):format(tostring(result)))
-                    return "stop"
+                    failures += 1
+                    if failures >= MaxEnchantFailures then
+                        SetStatus(weaponType, ("Enchant failed (%s) %d times in a row"):format(tostring(result), failures))
+                        return "stop"
+                    end
+                    SetStatus(weaponType, ("Enchant failed (%s), retrying %d/%d"):format(tostring(result), failures, MaxEnchantFailures - 1))
+                    continue
                 end
+                failures = 0
                 rolls += 1
                 -- From here on "roll #N" is the saved total for this weapon, not the count of this visit
                 local total = Rolls.Add(tool.Name)
