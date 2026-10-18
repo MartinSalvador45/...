@@ -2909,10 +2909,13 @@ setreadonly(MT, true)]])()
 
         StatusCheckLeviathan = function()
             if game.Workspace:GetAttribute("MAP") == "Sea3" then
-                if game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("CommF_"):InvokeServer("InfoLeviathan", "1") ~= -1 then
-                    if game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("CommF_"):InvokeServer("InfoLeviathan", "1") == 5 then
-                        return "You can find leviathan now"
-                    end
+                local Status = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("CommF_"):InvokeServer("InfoLeviathan", "1")
+
+                if Status == 5 then
+                    return "You can find leviathan now"
+                end
+
+                if type(Status) == "number" and Status >= 0 and Status < 5 then
                     return "Buy Find leviathan"
                 end
 
