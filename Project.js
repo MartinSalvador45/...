@@ -2356,6 +2356,25 @@ do
             return Value and Value > 0 and Value or Tbl7.SpeedDefaults[Key]
         end
 
+        -- Reset: keep setting Health to 0 until it has stayed at 0 for 3s and the character has respawned
+        Tbl7.ResetCharacter = function()
+            local Character = Players.LocalPlayer.Character
+            local DeadSince
+
+            repeat
+                local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
+
+                if Humanoid and Humanoid.Health > 0 then
+                    DeadSince = nil
+                    Humanoid.Health = 0
+                elseif not DeadSince then
+                    DeadSince = tick()
+                end
+
+                task.wait()
+            until DeadSince and tick() - DeadSince >= 3 and Players.LocalPlayer.Character ~= Character
+        end
+
         local Tbl8 = {}
         local V60 = nil
         local Flag2 = false
@@ -3023,10 +3042,13 @@ setreadonly(MT, true)]])()
         local Spinner = require(game:GetService("ReplicatedStorage").Controllers.UI.Spinner)
 
         spawn(function()
+            -- Bribes this account paid since the Spy was last at level 5 / on cooldown (-1): max 2 per account, then it waits for the next cycle
+            local Bribes = 0
+
             while wait(2) do
                 V13(function()
                     local V61 = StatusCheckLeviathan()
-                    V60:SetDesc(V61)
+                    V60:SetDesc(V61 == "Buy Find leviathan" and V61 .. " (bribed " .. Bribes .. "/2)" or V61)
 
                     if Config["Destroy IDK only Owner Boat"] then
                         SaveSettings("Status Leviathan", V61)
@@ -3035,8 +3057,15 @@ setreadonly(MT, true)]])()
                     end
 
                     if V61 == "Buy Find leviathan" then
-                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("InfoLeviathan", "1")
-                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("InfoLeviathan", "2")
+                        if Bribes < 2 then
+                            game.ReplicatedStorage.Remotes.CommF_:InvokeServer("InfoLeviathan", "1")
+                            local Paid = game.ReplicatedStorage.Remotes.CommF_:InvokeServer("InfoLeviathan", "2")
+
+                            -- 0 = not enough fragments (nothing paid), otherwise the new clue level
+                            if type(Paid) == "number" and Paid > 0 then
+                                Bribes += 1
+                            end
+                        end
 
                         if getgenv().WebhookIDK and Config["Webhook Destroy IDK"] then
                             getgenv().WebhookDestroyIdk()
@@ -3044,6 +3073,11 @@ setreadonly(MT, true)]])()
                         end
                     else
                         getgenv().WebhookIDK = true
+
+                        -- Level 5 (Leviathan out there) or -1 (cooldown after it): the next bribe round gets 2 again
+                        if V61 == "You can find leviathan now" or V61 == "I DONT KNOW" then
+                            Bribes = 0
+                        end
                     end
 
                     if not FFCMatch(LocalPlayer2.Character, "_BusoLayer1") and not LocalPlayer2.Character:FindFirstChild("HasBuso") then
@@ -6086,7 +6120,7 @@ end
                             if (Cframe.Position - LocalPlayer2.Character.HumanoidRootPart.Position).Magnitude > 8 then
                                 if (Cframe.Position - LocalPlayer2.Character.HumanoidRootPart.Position).Magnitude > 1000 and LocalPlayer2:GetAttribute("CurrentLocation") ~= "Tiki Outpost" then
                                     if game:GetService("Players").LocalPlayer.Data.LastSpawnPoint.Value == "Tiki" or game:GetService("Players").LocalPlayer.Data.LastSpawnPoint.Value == "Tiki2" then
-                                        LocalPlayer2.Character.Humanoid.Health = 0
+                                        Tbl7.ResetCharacter()
                                         return
                                     end
                                 end
@@ -6245,7 +6279,7 @@ end
                                     else
                                         if game:GetService("Players").LocalPlayer.Data.LastSpawnPoint.Value == "Tiki" or game:GetService("Players").LocalPlayer.Data.LastSpawnPoint.Value == "Tiki2" then
                                             Tbl7.SetStatus("Owner has boat, resetting...", Tbl7.Colors.Yellow)
-                                            LocalPlayer2.Character.Humanoid.Health = 0
+                                            Tbl7.ResetCharacter()
                                             return
                                         end
 
@@ -6267,7 +6301,7 @@ end
                                 else
                                     Tbl7.SetStatus("Owner no boat, resetting...", Tbl7.Colors.Yellow)
                                     if game:GetService("Players").LocalPlayer.Data.LastSpawnPoint.Value == "Tiki" or game:GetService("Players").LocalPlayer.Data.LastSpawnPoint.Value == "Tiki2" then
-                                        LocalPlayer2.Character.Humanoid.Health = 0
+                                        Tbl7.ResetCharacter()
                                         return
                                     end
                                 end
